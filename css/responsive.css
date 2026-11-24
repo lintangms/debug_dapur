@@ -1,0 +1,19 @@
+/* ==========================================================================
+   DEBUG DAPUR - Desktop Viewport Sizing
+   Enforces clean desktop 16:9 bounds without any edge clipping.
+   ========================================================================== */
+
+#game-wrapper {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+#game-container {
+  /* Desktop 16:9 preservation */
+  width: min(96vw, calc(92vh * (16 / 9)));
+  height: min(92vh, calc(96vw * (9 / 16)));
+  aspect-ratio: 16 / 9;
+}
