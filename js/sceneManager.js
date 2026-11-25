@@ -52,6 +52,25 @@ window.DebugDapur.SceneManager = (function() {
 
     bindEvents();
     renderLevelSelectGrid();
+    updateMenuSummary();
+    syncSoundButtonState();
+  }
+
+  function updateMenuSummary() {
+    const summaryElem = document.getElementById("stars-summary");
+    if (!summaryElem || !window.DebugDapur.StorageManager) return;
+    const data = window.DebugDapur.StorageManager.getData();
+    const totalStars = window.DebugDapur.StorageManager.getTotalStars();
+    const completedCount = Object.values(data.levelStars || {}).filter(s => s > 0).length;
+    summaryElem.textContent = `Progres: ${totalStars} / 21 Bintang • ${completedCount} / 7 Level`;
+  }
+
+  function syncSoundButtonState() {
+    const btnSound = document.getElementById("hud-btn-sound");
+    if (btnSound && window.DebugDapur.AudioManager) {
+      const isMuted = window.DebugDapur.AudioManager.isSfxMuted() && window.DebugDapur.AudioManager.isMusicMuted();
+      updateSoundButtonIcon(btnSound, isMuted);
+    }
   }
 
   function showScreen(screenName) {
@@ -66,11 +85,20 @@ window.DebugDapur.SceneManager = (function() {
       }
     });
 
+    // Always stop continuous cooking audio loops when leaving gameplay
+    if (screenName !== "gameplay" && window.DebugDapur.AudioManager) {
+      window.DebugDapur.AudioManager.stopAllContinuousSounds();
+    }
+
     // Close all open modals when switching major screens
     closeAllModals();
 
-    if (screenName === "level_select") {
+    if (screenName === "menu") {
+      updateMenuSummary();
+    } else if (screenName === "level_select") {
       renderLevelSelectGrid();
+    } else if (screenName === "gameplay") {
+      syncSoundButtonState();
     } else if (screenName === "quiz") {
       setupQuizScreen();
     }
@@ -185,8 +213,8 @@ window.DebugDapur.SceneManager = (function() {
     if (btnSound) {
       btnSound.addEventListener("click", () => {
         if (window.DebugDapur.AudioManager) {
-          const isMuted = window.DebugDapur.AudioManager.toggleSfxMute();
-          window.DebugDapur.AudioManager.toggleMusicMute();
+          const currentlyMuted = window.DebugDapur.AudioManager.isSfxMuted() && window.DebugDapur.AudioManager.isMusicMuted();
+          const isMuted = window.DebugDapur.AudioManager.setMuted(!currentlyMuted);
           updateSoundButtonIcon(btnSound, isMuted);
         }
       });
@@ -222,6 +250,9 @@ window.DebugDapur.SceneManager = (function() {
     }
     if (btnPauseMenu) {
       btnPauseMenu.addEventListener("click", () => {
+        if (window.DebugDapur.AudioManager) {
+          window.DebugDapur.AudioManager.stopAllContinuousSounds();
+        }
         closeModal("pause");
         showScreen("menu");
       });
@@ -301,12 +332,22 @@ window.DebugDapur.SceneManager = (function() {
 
     if (btnConfirmYes) {
       btnConfirmYes.addEventListener("click", () => {
+        if (window.DebugDapur.AudioManager) {
+          window.DebugDapur.AudioManager.stopAllContinuousSounds();
+        }
         if (window.DebugDapur.StorageManager) {
           window.DebugDapur.StorageManager.resetProgress();
         }
+        if (window.DebugDapur.AudioManager) {
+          window.DebugDapur.AudioManager.applySettings();
+          window.DebugDapur.AudioManager.stopBgm();
+        }
+        syncSoundButtonState();
+        populateSettings();
         closeModal("resetConfirm");
         closeModal("settings");
         renderLevelSelectGrid();
+        updateMenuSummary();
         alert("Seluruh data progres dan skor telah direset ke awal.");
       });
     }
@@ -360,17 +401,31 @@ window.DebugDapur.SceneManager = (function() {
 
     // Find missing node for puzzle
     const missingNode = levelData.flowchart.nodes.find(n => n.isMissing);
+    const hintBtn = document.getElementById("fc-btn-hint");
+
+    if (hintBtn) {
+      hintBtn.style.display = missingNode ? "inline-flex" : "none";
+      hintBtn.onclick = () => {
+        if (missingNode && missingNode.hint && speechElem) {
+          speechElem.textContent = `Petunjuk Chef Bug: ${missingNode.hint}`;
+        }
+        if (window.DebugDapur.AudioManager) {
+          window.DebugDapur.AudioManager.playClick();
+        }
+      };
+    }
 
     if (!missingNode) {
       // No missing node: allow immediate cooking
       if (startCookingBtn) startCookingBtn.disabled = false;
       if (optionsContainer) optionsContainer.innerHTML = "<div style='color:#78909C; font-weight:700;'>Flowchart lengkap dan siap dieksekusi!</div>";
     } else {
-      // Missing node: render puzzle choice options
+      // Missing node: render SHUFFLED puzzle choice options so correct answer isn't always leftmost
       if (startCookingBtn) startCookingBtn.disabled = true;
       if (optionsContainer) {
         optionsContainer.innerHTML = "";
-        missingNode.options.forEach(optText => {
+        const shuffledOptions = window.DebugDapur.FlowchartSystem.getShuffledOptions(missingNode);
+        shuffledOptions.forEach(optText => {
           const btn = document.createElement("button");
           btn.className = "fc-option-btn";
           btn.textContent = optText;
@@ -416,6 +471,9 @@ window.DebugDapur.SceneManager = (function() {
       if (feedbackBox) {
         feedbackBox.className = "flowchart-feedback-alert error";
         feedbackBox.textContent = `BELUM TEPAT: ${result.explanation}`;
+      }
+      if (speechElem && result.hint) {
+        speechElem.textContent = `Petunjuk: ${result.hint}`;
       }
       if (startCookingBtn) startCookingBtn.disabled = true;
     }

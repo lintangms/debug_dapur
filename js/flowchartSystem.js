@@ -1,7 +1,7 @@
 /**
  * DEBUG DAPUR - Flowchart System
  * Renders standard flowchart diagrams (Terminator, Process, Decision, Subroutine)
- * and provides interactive pre-cooking analysis & puzzle validation.
+ * with clear two-column YA/TIDAK branching and shuffled interactive puzzle choices.
  */
 
 window.DebugDapur = window.DebugDapur || {};
@@ -23,6 +23,21 @@ window.DebugDapur.FlowchartSystem = (function() {
 
   function isChallengeSolved() {
     return isSolved;
+  }
+
+  /**
+   * Returns a Fisher-Yates shuffled copy of options so the answer is never stuck in one position.
+   */
+  function getShuffledOptions(missingNode) {
+    if (!missingNode || !Array.isArray(missingNode.options)) return [];
+    const copy = missingNode.options.slice();
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = copy[i];
+      copy[i] = copy[j];
+      copy[j] = temp;
+    }
+    return copy;
   }
 
   /**
@@ -54,11 +69,55 @@ window.DebugDapur.FlowchartSystem = (function() {
       if (window.DebugDapur.AudioManager) {
         window.DebugDapur.AudioManager.playBugError();
       }
+      const specificReason = (missingNode.wrongFeedback && missingNode.wrongFeedback[optionText])
+        ? missingNode.wrongFeedback[optionText]
+        : "Pilihan ini belum tepat. Perhatikan kembali alur sebelum dan sesudah kotak bertanda [ ? ].";
       return {
         valid: false,
-        explanation: "Pilihan ini belum tepat. Perhatikan kembali urutan logis atau kondisi yang harus dievaluasi."
+        explanation: specificReason,
+        hint: missingNode.hint || ""
       };
     }
+  }
+
+  function renderNodeMarkup(node, isInteractive, isActive) {
+    const isMissingNode = node.isMissing && !isSolved && isInteractive;
+
+    let shapeClass = "fc-process";
+    let shapeTag = "PROSES";
+
+    if (node.type === "terminator") {
+      shapeClass = "fc-terminator";
+      shapeTag = "TERMINATOR";
+    } else if (node.type === "decision") {
+      shapeClass = "fc-decision";
+      shapeTag = "◆ KONDISI (IF?)";
+    } else if (node.type === "subroutine") {
+      shapeClass = "fc-subroutine";
+      shapeTag = "SUB-RUTIN";
+    }
+
+    if (isMissingNode) {
+      shapeClass += " fc-missing";
+    } else if (node.isMissing && isSolved) {
+      shapeClass += " fc-solved";
+    }
+
+    if (isActive) {
+      shapeClass += " fc-active-step";
+    }
+
+    const displayText = isMissingNode
+      ? (selectedOption ? selectedOption : "[ ? ] Pilih jawaban yang tepat di bawah")
+      : node.label;
+
+    return `
+      <div class="fc-node ${shapeClass}" data-node-id="${node.id}">
+        <div class="fc-node-tag">${shapeTag}</div>
+        <div class="fc-node-label">${displayText}</div>
+        ${node.isLoopBack ? '<div class="fc-loop-badge">↺ Ulangi ke Kondisi</div>' : ''}
+      </div>
+    `;
   }
 
   /**
@@ -71,65 +130,59 @@ window.DebugDapur.FlowchartSystem = (function() {
     const isInteractive = options.interactive !== false;
     const activeStepIndex = options.activeStepIndex !== undefined ? options.activeStepIndex : -1;
 
+    const nodeById = {};
+    const indexById = {};
+    fc.nodes.forEach((n, i) => {
+      nodeById[n.id] = n;
+      indexById[n.id] = i;
+    });
+
+    const renderedBranchIds = new Set();
     let html = `<div class="flowchart-diagram-wrapper">`;
 
     fc.nodes.forEach((node, idx) => {
-      const isMissingNode = node.isMissing && !isSolved && isInteractive;
+      if (renderedBranchIds.has(node.id)) return;
+
       const isActive = (idx === activeStepIndex);
+      html += `<div class="fc-node-container" data-node-id="${node.id}">`;
+      html += renderNodeMarkup(node, isInteractive, isActive);
 
-      let shapeClass = "fc-process";
-      let shapeTag = "PROSES";
+      const yesNode = node.yesTo ? nodeById[node.yesTo] : null;
+      const noNode = node.noTo ? nodeById[node.noTo] : null;
 
-      if (node.type === "terminator") {
-        shapeClass = "fc-terminator";
-        shapeTag = "TERMINATOR";
-      } else if (node.type === "decision") {
-        shapeClass = "fc-decision";
-        shapeTag = "DECISION (IF)";
-      } else if (node.type === "subroutine") {
-        shapeClass = "fc-subroutine";
-        shapeTag = "SUB-RUTIN";
-      }
+      if (node.type === "decision" && yesNode && noNode) {
+        renderedBranchIds.add(yesNode.id);
+        renderedBranchIds.add(noNode.id);
 
-      if (isMissingNode) {
-        shapeClass += " fc-missing";
-      } else if (node.isMissing && isSolved) {
-        shapeClass += " fc-solved";
-      }
+        const yesActive = (indexById[yesNode.id] === activeStepIndex);
+        const noActive = (indexById[noNode.id] === activeStepIndex);
 
-      if (isActive) {
-        shapeClass += " fc-active-step";
-      }
-
-      const displayText = (isMissingNode) 
-        ? (selectedOption ? selectedOption : "[ ? ] Klik pilihan di bawah untuk melengkapi") 
-        : node.label;
-
-      html += `
-        <div class="fc-node-container" data-node-id="${node.id}">
-          <div class="fc-node ${shapeClass}">
-            <div class="fc-node-tag">${shapeTag}</div>
-            <div class="fc-node-label">${displayText}</div>
-            ${node.isLoopBack ? '<div class="fc-loop-badge">Loop Kembali ↺</div>' : ''}
+        html += `
+          <div class="fc-branch-split">
+            <div class="fc-branch-col fc-branch-col-yes">
+              <div class="fc-branch-pill fc-pill-yes">YA (Benar) ↓</div>
+              ${renderNodeMarkup(yesNode, isInteractive, yesActive)}
+            </div>
+            <div class="fc-branch-col fc-branch-col-no">
+              <div class="fc-branch-pill fc-pill-no">TIDAK (Salah) ↓</div>
+              ${renderNodeMarkup(noNode, isInteractive, noActive)}
+            </div>
           </div>
-      `;
+        `;
 
-      // Branch decision indicators or standard downward arrow
-      if (idx < fc.nodes.length - 1) {
-        if (node.type === "decision") {
+        // Check if there are remaining unrendered nodes after the branch
+        const hasRemaining = fc.nodes.slice(idx + 1).some(n => !renderedBranchIds.has(n.id));
+        if (hasRemaining) {
           html += `
-            <div class="fc-decision-branches">
-              <div class="fc-branch fc-branch-yes">
-                <span class="fc-branch-label">YA (True)</span>
-                <div class="fc-arrow-down">↓</div>
-              </div>
-              <div class="fc-branch fc-branch-no">
-                <span class="fc-branch-label">TIDAK (False)</span>
-                <div class="fc-arrow-turn">⤴ Tunggu</div>
-              </div>
+            <div class="fc-connector">
+              <div class="fc-line"></div>
+              <div class="fc-arrowhead">▼</div>
             </div>
           `;
-        } else {
+        }
+      } else {
+        const hasNextUnrendered = fc.nodes.slice(idx + 1).some(n => !renderedBranchIds.has(n.id));
+        if (hasNextUnrendered) {
           html += `
             <div class="fc-connector">
               <div class="fc-line"></div>
@@ -150,6 +203,7 @@ window.DebugDapur.FlowchartSystem = (function() {
     initLevel,
     getFlowchartData,
     isChallengeSolved,
+    getShuffledOptions,
     submitChallengeOption,
     renderFlowchartHtml
   };

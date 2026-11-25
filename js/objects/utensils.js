@@ -8,24 +8,25 @@ window.DebugDapur.Objects = window.DebugDapur.Objects || {};
 
 window.DebugDapur.Objects.Utensils = class Utensils {
   constructor() {
-    // Spatula on counter
+    // Spatula on counter (clearly placed to the right of the stove, never hidden behind it)
     this.spatula = {
-      x: 750,
-      y: 430,
-      width: 70,
-      height: 24,
+      x: 845,
+      y: 335,
+      width: 74,
+      height: 28,
       isHovered: false,
       isHeld: false,
       stirAngle: 0,
+      stirAnimTimer: 0,
       stirCount: 0
     };
 
     // Serving Plate Station
     this.plate = {
-      x: 870,
-      y: 425,
-      radiusX: 65,
-      radiusY: 35,
+      x: 890,
+      y: 440,
+      radiusX: 62,
+      radiusY: 32,
       isHovered: false,
       hasDish: false,
       dishName: ""
@@ -33,13 +34,17 @@ window.DebugDapur.Objects.Utensils = class Utensils {
 
     // Water Tap / Sink Station (Left side)
     this.tap = {
-      x: 210,
-      y: 350,
+      x: 195,
+      y: 345,
       width: 60,
       height: 80,
       isRunning: false,
       waterStreamTimer: 0
     };
+  }
+
+  triggerSpatulaUse() {
+    this.spatula.stirAnimTimer = 320;
   }
 
   update(dt) {
@@ -50,11 +55,18 @@ window.DebugDapur.Objects.Utensils = class Utensils {
         this.tap.waterStreamTimer = 0;
       }
     }
+
+    if (this.spatula.stirAnimTimer > 0) {
+      this.spatula.stirAnimTimer = Math.max(0, this.spatula.stirAnimTimer - dt);
+      this.spatula.stirAngle = Math.sin(this.spatula.stirAnimTimer * 0.04) * 0.35;
+    } else {
+      this.spatula.stirAngle = 0;
+    }
   }
 
   isPointInSpatula(px, py) {
     const s = this.spatula;
-    return px >= s.x - 30 && px <= s.x + 30 && py >= s.y - 20 && py <= s.y + 20;
+    return px >= s.x - 42 && px <= s.x + 42 && py >= s.y - 26 && py <= s.y + 28;
   }
 
   isPointInPlate(px, py) {
@@ -164,30 +176,60 @@ window.DebugDapur.Objects.Utensils = class Utensils {
   renderSpatula(ctx) {
     const s = this.spatula;
     ctx.save();
-    ctx.translate(s.x, s.y);
+
+    // Utensil rest / ceramic holder mat on counter so spatula stands out clearly
+    ctx.fillStyle = "rgba(0, 0, 0, 0.16)";
+    ctx.beginPath();
+    ctx.roundRect(s.x - 38, s.y - 18, 78, 38, 10);
+    ctx.fill();
+
+    ctx.fillStyle = s.isHovered ? "#FFF8E1" : "#ECEFF1";
+    ctx.strokeStyle = s.isHovered ? "#FF9800" : "#B0BEC5";
+    ctx.lineWidth = s.isHovered ? 2.5 : 2;
+    ctx.beginPath();
+    ctx.roundRect(s.x - 40, s.y - 20, 78, 38, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.translate(s.x, s.y - 2);
     ctx.rotate(s.stirAngle);
+
+    // Spatula shadow
+    ctx.fillStyle = "rgba(0, 0, 0, 0.15)";
+    ctx.beginPath();
+    ctx.roundRect(-29, -2, 38, 8, 3);
+    ctx.roundRect(9, -10, 24, 24, 4);
+    ctx.fill();
 
     // Spatula handle (wood)
     ctx.fillStyle = "#8D6E63";
     ctx.strokeStyle = "#5D4037";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(-28, -4, 38, 8, 3);
+    ctx.roundRect(-30, -4, 38, 8, 3);
     ctx.fill();
     ctx.stroke();
 
-    // Spatula blade (silicone / metal)
-    ctx.fillStyle = s.isHovered ? "#FF7043" : "#D32F2F";
+    // Spatula blade (bright silicone / metal)
+    ctx.fillStyle = s.isHovered ? "#FF7043" : "#E53935";
     ctx.beginPath();
-    ctx.roundRect(10, -12, 24, 24, 4);
+    ctx.roundRect(8, -12, 24, 24, 4);
     ctx.fill();
     ctx.stroke();
 
     // Slots in blade
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(16, -8, 2, 16);
-    ctx.fillRect(22, -8, 2, 16);
+    ctx.fillRect(14, -8, 2, 16);
+    ctx.fillRect(21, -8, 2, 16);
 
+    ctx.restore();
+
+    // Clear label below utensil rest
+    ctx.save();
+    ctx.font = "bold 10px 'Segoe UI', sans-serif";
+    ctx.fillStyle = s.isHovered ? "#FFE082" : "#CFD8DC";
+    ctx.textAlign = "center";
+    ctx.fillText("SPATULA", s.x, s.y + 30);
     ctx.restore();
 
     // Stir count badge if active
@@ -195,13 +237,13 @@ window.DebugDapur.Objects.Utensils = class Utensils {
       ctx.save();
       ctx.fillStyle = "#E65100";
       ctx.beginPath();
-      ctx.arc(s.x + 22, s.y - 18, 12, 0, Math.PI * 2);
+      ctx.arc(s.x + 32, s.y - 22, 12, 0, Math.PI * 2);
       ctx.fill();
       ctx.font = "bold 11px sans-serif";
       ctx.fillStyle = "#FFFFFF";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(s.stirCount + "x", s.x + 22, s.y - 18);
+      ctx.fillText(s.stirCount + "x", s.x + 32, s.y - 22);
       ctx.restore();
     }
   }

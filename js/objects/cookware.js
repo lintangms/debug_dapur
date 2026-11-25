@@ -13,6 +13,8 @@ window.DebugDapur.Objects.Cookware = class Cookware {
     this.y = y;
     this.initialX = x;
     this.initialY = y;
+    this.homeX = x;
+    this.homeY = y;
     this.width = width;
     this.height = height;
 
@@ -44,15 +46,30 @@ window.DebugDapur.Objects.Cookware = class Cookware {
     this.isBurnt = false;
     this.isDone = false;
 
-    // Animation timers
+    // Animation & cooking timers
     this.timer = 0;
+    this.eggCookTimer = 0;
+    this.eggCookTopTimer = 0;
+    this.overcookTimer = 0;
+    this.chickenCookTimer = 0;
+    this.noodlesTimer = 0;
+    this.splatterHandled = false;
     this.bubbles = [];
     this.steamParticles = [];
   }
 
+  setHomePosition(x, y) {
+    this.homeX = x;
+    this.homeY = y;
+    if (!this.isDockedOnStove) {
+      this.x = x;
+      this.y = y;
+    }
+  }
+
   reset() {
-    this.x = this.initialX;
-    this.y = this.initialY;
+    this.x = this.homeX;
+    this.y = this.homeY;
     this.isDockedOnStove = false;
     this.activeBurner = null;
     this.hasWater = false;
@@ -72,6 +89,13 @@ window.DebugDapur.Objects.Cookware = class Cookware {
     this.riceCooked = false;
     this.isBurnt = false;
     this.isDone = false;
+    this.timer = 0;
+    this.eggCookTimer = 0;
+    this.eggCookTopTimer = 0;
+    this.overcookTimer = 0;
+    this.chickenCookTimer = 0;
+    this.noodlesTimer = 0;
+    this.splatterHandled = false;
     this.bubbles = [];
     this.steamParticles = [];
   }
@@ -261,14 +285,51 @@ window.DebugDapur.Objects.Cookware = class Cookware {
       ctx.fill();
     });
 
-    // Warning text if splattering
+    // Warning text if splattering, or helpful cooking status pill
     if (this.isOilSplattering) {
-      ctx.fillStyle = "#FF1744";
-      ctx.font = "bold 13px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("PERINGATAN: MINYAK MELETUP! KECILKAN API!", this.x, this.y - 45);
+      this.renderStatusPill(ctx, "MINYAK MELETUP! KECILKAN API!", "#D50000", "#FFEBEE");
+    } else if (this.isBurnt) {
+      this.renderStatusPill(ctx, "GOSONG!", "#212121", "#FFCDD2");
+    } else if (this.isDone) {
+      this.renderStatusPill(ctx, "MATANG! Klik Piring Saji", "#1B5E20", "#E8F5E9");
+    } else if (this.type === 'pan' && this.contents.includes('egg') && this.eggBottomCooked && !this.eggFlipped) {
+      this.renderStatusPill(ctx, "SIAP DIBALIK! Klik Spatula", "#E65100", "#FFF3E0");
+    } else if (this.type === 'pan' && this.contents.includes('chicken') && this.chickenCookTimer > 5500 && !this.chickenFlipped) {
+      this.renderStatusPill(ctx, "SIAP DIBALIK! Klik Spatula", "#E65100", "#FFF3E0");
+    } else if (this.type === 'pot' && this.isBoiling && !this.contents.includes('noodles')) {
+      this.renderStatusPill(ctx, "MENDIDIH (100°C)", "#01579B", "#E1F5FE");
+    } else if (this.type === 'pan' && this.isOilHot && this.contents.length === 0) {
+      this.renderStatusPill(ctx, "MINYAK PANAS!", "#E65100", "#FFF8E1");
+    } else if (this.isDockedOnStove && this.hasWater && !this.isBoiling && this.activeBurner && this.activeBurner.isLit) {
+      this.renderStatusPill(ctx, `Memanaskan Air: ${Math.round(this.waterTemp)}°C`, "#0277BD", "#E1F5FE");
+    } else if (this.isDockedOnStove && this.hasOil && !this.isOilHot && this.activeBurner && this.activeBurner.isLit) {
+      this.renderStatusPill(ctx, `Memanaskan Minyak: ${Math.round(this.oilTemp)}°C`, "#EF6C00", "#FFF8E1");
     }
 
+    ctx.restore();
+  }
+
+  renderStatusPill(ctx, text, textColor, bgColor) {
+    ctx.save();
+    ctx.font = "bold 11px 'Segoe UI', sans-serif";
+    const textWidth = ctx.measureText(text).width;
+    const pillW = textWidth + 16;
+    const pillH = 20;
+    const px = this.x - pillW * 0.5;
+    const py = this.y - 54;
+
+    ctx.fillStyle = bgColor;
+    ctx.strokeStyle = textColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(px, py, pillW, pillH, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = textColor;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, this.x, py + pillH * 0.5);
     ctx.restore();
   }
 

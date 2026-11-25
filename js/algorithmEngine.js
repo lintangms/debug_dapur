@@ -84,10 +84,13 @@ window.DebugDapur.AlgorithmEngine = (function() {
   function validateLevel1(action, ctx) {
     const pot = ctx.pot;
     const stove = ctx.stove;
+    const targetBurner = (ctx.burnerId !== undefined && stove.burners[ctx.burnerId])
+      ? stove.burners[ctx.burnerId]
+      : (pot.activeBurner || stove.burners[0]);
 
-    // Turning on stove without pot
+    // Turning on stove without pot on that burner
     if (action === "TURN_ON_STOVE") {
-      if (!pot.isDockedOnStove) {
+      if (!pot.isDockedOnStove || targetBurner.dockedCookware !== pot) {
         bugCount++;
         return {
           valid: false,
@@ -111,7 +114,7 @@ window.DebugDapur.AlgorithmEngine = (function() {
 
     // Filling water after placing pot on active lit stove
     if (action === "FILL_WATER") {
-      if (pot.isDockedOnStove && stove.burners[0].isLit) {
+      if (pot.isDockedOnStove && pot.activeBurner && pot.activeBurner.isLit) {
         bugCount++;
         return {
           valid: false,
@@ -125,7 +128,8 @@ window.DebugDapur.AlgorithmEngine = (function() {
 
     // Placing pot without water on lit stove
     if (action === "PLACE_POT_STOVE") {
-      if (stove.burners[0].isLit && !pot.hasWater) {
+      const anyLitEmptyBurner = stove.burners.some(b => b.isLit && !b.dockedCookware);
+      if (anyLitEmptyBurner && !pot.hasWater) {
         bugCount++;
         return {
           valid: false,
@@ -297,14 +301,30 @@ window.DebugDapur.AlgorithmEngine = (function() {
     }
 
     if (action === "FLIP_CHICKEN") {
+      if (!pan.contents.includes("chicken")) {
+        return { valid: false, title: "Wajan Kosong!", explanation: "Masukkan ayam ke minyak panas terlebih dahulu." };
+      }
       if (pan.isOilSplattering) {
         bugCount++;
         return {
           valid: false,
           bugType: "NESTED_CONDITIONAL_BUG",
           title: "BUG PERCABANGAN BERSARANG!",
-          explanation: "Minyak sedang meletup-letup panas! Kamu harus mengecilkan api atau menutup wajan terlebih dahulu sebelum membalik ayam!\n\nIF (minyak_panas) {\n    IF (minyak_meletup == true) {\n        kecilkan_api(); // HARUS DILAKUKAN DULU!\n    } ELSE {\n        balik_ayam();\n    }\n}",
+          explanation: "Minyak sedang meletup-letup panas! Kamu harus mengecilkan api kompor terlebih dahulu sebelum membalik ayam!\n\nIF (minyak_panas) {\n    IF (minyak_meletup == true) {\n        kecilkan_api(); // HARUS DILAKUKAN DULU!\n    } ELSE {\n        balik_ayam();\n    }\n}",
           concept: "Nested Conditional: Selesaikan kondisi internal (inner IF) sebelum melanjutkan aksi lain."
+        };
+      }
+    }
+
+    if (action === "SERVE_DISH") {
+      if (!pan.contents.includes("chicken") || !pan.chickenFlipped || !pan.chickenCooked) {
+        bugCount++;
+        return {
+          valid: false,
+          bugType: "PREMATURE_TERMINATION",
+          title: "BUG: AYAM BELUM MATANG SEMPURNA!",
+          explanation: "Pastikan ayam sudah digoreng di minyak panas, api dikecilkan saat letupan, ayam dibalik dengan spatula, dan tunggu hingga matang keemasan sebelum disajikan.",
+          concept: "Terminasi Bersyarat: Sajikan hanya jika seluruh kondisi kematangan bernilai TRUE."
         };
       }
     }

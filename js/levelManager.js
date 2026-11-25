@@ -33,17 +33,18 @@ window.DebugDapur.LevelManager = (function() {
   };
 
   function init(canvasWidth, canvasHeight) {
-    // Instantiate persistent kitchen objects with optimized desktop spacing
+    // Instantiate persistent kitchen objects with clean non-overlapping desktop spacing
     chefBug = new window.DebugDapur.Objects.ChefBug(1040, 310, 1.0);
-    stove = new window.DebugDapur.Objects.Stove(450, 310, 320, 150);
-    pot = new window.DebugDapur.Objects.Cookware('pot', 315, 380, 130, 85);
-    pan = new window.DebugDapur.Objects.Cookware('pan', 315, 380, 140, 80);
+    stove = new window.DebugDapur.Objects.Stove(455, 305, 320, 150);
+    pot = new window.DebugDapur.Objects.Cookware('pot', 330, 335, 125, 82);
+    pan = new window.DebugDapur.Objects.Cookware('pan', 365, 445, 135, 78);
     ingredients = new window.DebugDapur.Objects.Ingredients(350, 560, 500, 95);
     utensils = new window.DebugDapur.Objects.Utensils();
 
-    // Register click & drag handlers with InputManager
+    // Register click & hover handlers with InputManager
     if (window.DebugDapur.InputManager) {
       window.DebugDapur.InputManager.on('click', handleCanvasClick);
+      window.DebugDapur.InputManager.on('move', handleCanvasMove);
     }
   }
 
@@ -52,39 +53,47 @@ window.DebugDapur.LevelManager = (function() {
     levelData = window.DebugDapur.Data.LEVELS.find(l => l.id === currentLevelId);
     if (!levelData) return;
 
+    // Always stop any leftover continuous cooking audio when starting/restarting a level
+    if (window.DebugDapur.AudioManager) {
+      window.DebugDapur.AudioManager.stopAllContinuousSounds();
+    }
+
     startTime = Date.now();
     actionCount = 0;
     isLevelCompleted = false;
 
-    // Reset objects
-    pot.reset();
-    pan.reset();
-    stove.burners[0].isLit = false;
-    stove.burners[0].heatLevel = 'OFF';
-    stove.burners[0].heatPower = 0;
+    // Reset burner states cleanly
+    stove.setHeatLevel(0, 'OFF');
+    stove.setHeatLevel(1, 'OFF');
     stove.burners[0].dockedCookware = null;
-    stove.burners[1].isLit = false;
     stove.burners[1].dockedCookware = null;
 
+    // Assign clean non-overlapping home positions based on cookware mode
+    if (levelData.cookwareNeeded === 'pot') {
+      pot.setHomePosition(330, 385);
+      pan.setHomePosition(365, 445);
+    } else if (levelData.cookwareNeeded === 'pan') {
+      pot.setHomePosition(330, 335);
+      pan.setHomePosition(365, 395);
+    } else {
+      // 'multi' (Level 6) or 'boss_editor' (Level 7): keep well separated
+      pot.setHomePosition(335, 335);
+      pan.setHomePosition(365, 445);
+      if (levelData.cookwareNeeded === 'multi') {
+        level6State = { riceDone: false, chickenDone: false, eggDone: false, assembled: false };
+      }
+    }
+
+    pot.reset();
+    pan.reset();
+
     utensils.spatula.stirCount = 0;
+    utensils.spatula.stirAnimTimer = 0;
+    utensils.spatula.stirAngle = 0;
     utensils.plate.hasDish = false;
     utensils.plate.dishName = "";
     utensils.tap.isRunning = false;
-
-    // Setup active cookware & ingredients
-    if (levelData.cookwareNeeded === 'pot') {
-      pot.x = 315;
-      pot.y = 380;
-    } else if (levelData.cookwareNeeded === 'pan') {
-      pan.x = 315;
-      pan.y = 380;
-    } else if (levelData.cookwareNeeded === 'multi') {
-      pot.x = 295;
-      pot.y = 360;
-      pan.x = 295;
-      pan.y = 440;
-      level6State = { riceDone: false, chickenDone: false, eggDone: false, assembled: false };
-    }
+    utensils.tap.waterStreamTimer = 0;
 
     if (levelData.availableIngredients) {
       ingredients.setAvailableIngredients(levelData.availableIngredients);
@@ -119,21 +128,91 @@ window.DebugDapur.LevelManager = (function() {
     ];
   }
 
+  function isSimulationPaused() {
+    const blockingModalIds = [
+      "modal-pause",
+      "bug-modal",
+      "modal-level-complete",
+      "modal-recipe-board",
+      "modal-flowchart"
+    ];
+    return blockingModalIds.some(id => {
+      const el = document.getElementById(id);
+      return el && !el.classList.contains("hidden");
+    });
+  }
+
+  function syncCookingAudio() {
+    if (!window.DebugDapur.AudioManager || !stove) return;
+    const anyBoilingOnLit = stove.burners.some(
+      b => b.isLit && b.dockedCookware && b.dockedCookware.hasWater && b.dockedCookware.isBoiling
+    );
+    const anySizzlingOnLit = stove.burners.some(
+      b => b.isLit && b.dockedCookware && b.dockedCookware.hasOil && b.dockedCookware.isOilHot
+    );
+
+    if (!anyBoilingOnLit) {
+      window.DebugDapur.AudioManager.stopContinuousSound('boiling');
+    } else {
+      window.DebugDapur.AudioManager.startContinuousSound('boiling');
+    }
+
+    if (!anySizzlingOnLit) {
+      window.DebugDapur.AudioManager.stopContinuousSound('sizzling');
+    } else {
+      window.DebugDapur.AudioManager.startContinuousSound('sizzling');
+    }
+  }
+
   function update(dt) {
     if (chefBug) chefBug.update(dt);
+    if (isLevelCompleted || isSimulationPaused()) return;
+
     if (stove) stove.update(dt);
     if (pot) pot.update(dt);
     if (pan) pan.update(dt);
     if (utensils) utensils.update(dt);
 
-    // Check automatic boiling or cooking completion
+    syncCookingAudio();
+
+    // Check automatic boiling completion on Level 1
     if (currentLevelId === 1 && pot.isBoiling && !isLevelCompleted) {
       completeCurrentLevel();
     }
   }
 
+  function handleCanvasMove(mouse) {
+    if (!levelData) return;
+    const mx = mouse.x;
+    const my = mouse.y;
+
+    if (utensils) {
+      utensils.spatula.isHovered = utensils.isPointInSpatula(mx, my);
+      utensils.plate.isHovered = utensils.isPointInPlate(mx, my);
+    }
+    if (ingredients) {
+      ingredients.hoveredItem = ingredients.getItemAt(mx, my);
+    }
+
+    const canvas = window.DebugDapur.Game && window.DebugDapur.Game.getCanvas();
+    if (canvas) {
+      const overCookware =
+        (pot && levelData.cookwareNeeded !== 'pan' && pot.isPointInside(mx, my)) ||
+        (pan && levelData.cookwareNeeded !== 'pot' && pan.isPointInside(mx, my));
+      const overStove = stove && (stove.isPointInKnob(mx, my, 0) || stove.isPointInKnob(mx, my, 1));
+      const overChef = chefBug && ((mx - chefBug.x) ** 2 + (my - chefBug.y) ** 2 <= 55 * 55);
+      const isInteractive =
+        (utensils && (utensils.spatula.isHovered || utensils.plate.isHovered || utensils.isPointInTap(mx, my))) ||
+        (ingredients && ingredients.hoveredItem) ||
+        overCookware ||
+        overStove ||
+        overChef;
+      canvas.style.cursor = isInteractive ? "pointer" : "default";
+    }
+  }
+
   function handleCanvasClick(mouse) {
-    if (isLevelCompleted) return;
+    if (isLevelCompleted || isSimulationPaused()) return;
     actionCount++;
 
     const mx = mouse.x;
@@ -155,7 +234,17 @@ window.DebugDapur.LevelManager = (function() {
       return;
     }
 
-    // 3. Cookware Clicks (Move to Stove / Prep)
+    // 3. Spatula & Plate Utensil Clicks (check before cookware so right-side utensils always respond)
+    if (utensils.isPointInSpatula(mx, my)) {
+      handleSpatulaClick();
+      return;
+    }
+    if (utensils.isPointInPlate(mx, my)) {
+      handlePlateClick();
+      return;
+    }
+
+    // 4. Cookware Clicks (Move to Stove / Prep)
     if (pot.isPointInside(mx, my) && levelData.cookwareNeeded !== 'pan') {
       handlePotClick();
       return;
@@ -165,26 +254,14 @@ window.DebugDapur.LevelManager = (function() {
       return;
     }
 
-    // 4. Ingredient Shelf Click
+    // 5. Ingredient Shelf Click
     const clickedItem = ingredients.getItemAt(mx, my);
     if (clickedItem) {
       handleIngredientClick(clickedItem);
       return;
     }
 
-    // 5. Spatula Utensil Click (Stir / Flip)
-    if (utensils.isPointInSpatula(mx, my)) {
-      handleSpatulaClick();
-      return;
-    }
-
-    // 6. Plate Serving Station Click
-    if (utensils.isPointInPlate(mx, my)) {
-      handlePlateClick();
-      return;
-    }
-
-    // 7. Chef Bug Click (Ask for Hint)
+    // 6. Chef Bug Click (Ask for Hint)
     const dx = mx - chefBug.x;
     const dy = my - chefBug.y;
     if (dx * dx + dy * dy <= 55 * 55) {
@@ -226,29 +303,33 @@ window.DebugDapur.LevelManager = (function() {
 
     // If currently lit, turn off or adjust
     if (burner.isLit) {
-      if (currentLevelId === 5 && pan.isOilSplattering) {
+      if (currentLevelId === 5 && burner.dockedCookware === pan && pan.isOilSplattering) {
         // Special nested conditional resolution: lower heat
         stove.setHeatLevel(burnerId, 'LOW');
         pan.isOilSplattering = false;
         pan.splatterHandled = true;
+        if (window.DebugDapur.AudioManager) {
+          window.DebugDapur.AudioManager.playClick();
+        }
         logStep("Mengecilkan api kompor (Mengatasi letupan minyak)", true);
         chefBug.setState("happy", "Bagus! Api dikecilkan, letupan minyak teratasi!", 3000);
         updateHUD();
         return;
       }
       stove.toggleBurner(burnerId);
+      syncCookingAudio();
       logStep(`Mematikan api burner kompor #${burnerId + 1}`, true);
       updateHUD();
       return;
     }
 
     // Turning on stove: Validate with Algorithm Engine
-    const activeCookware = burnerId === 0 ? (pot.isDockedOnStove ? pot : (pan.isDockedOnStove ? pan : null)) : null;
     const validation = window.DebugDapur.AlgorithmEngine.validateAction("TURN_ON_STOVE", {
       pot,
       pan,
       stove,
-      burnerId
+      burnerId,
+      activeCookware: burner.dockedCookware
     });
 
     if (!validation.valid) {
@@ -264,23 +345,25 @@ window.DebugDapur.LevelManager = (function() {
 
   function handlePotClick() {
     if (!pot.isDockedOnStove) {
-      // Dock on burner 0
+      // Dock on burner 1 in multi mode (keeps pan handle away on burner 0), or burner 0 otherwise
+      const preferredBurner = (levelData && levelData.cookwareNeeded === 'multi') ? 1 : 0;
       const validation = window.DebugDapur.AlgorithmEngine.validateAction("PLACE_POT_STOVE", { pot, stove });
       if (!validation.valid) {
         window.DebugDapur.FeedbackSystem.showBugAlert(validation, chefBug);
         return;
       }
-      stove.dock(pot, 0);
+      stove.dock(pot, preferredBurner);
       if (window.DebugDapur.AudioManager) {
         window.DebugDapur.AudioManager.playClick();
       }
       logStep("Meletakkan panci di atas kompor", true);
       chefBug.setState("idle", "Panci sudah di atas kompor.", 2000);
     } else {
-      // Undock back to counter
+      // Undock back to counter home position
       stove.undock(pot);
-      pot.x = 315;
-      pot.y = 380;
+      pot.x = pot.homeX;
+      pot.y = pot.homeY;
+      syncCookingAudio();
       if (window.DebugDapur.AudioManager) {
         window.DebugDapur.AudioManager.playClick();
       }
@@ -298,8 +381,9 @@ window.DebugDapur.LevelManager = (function() {
       logStep("Meletakkan wajan di atas kompor", true);
     } else {
       stove.undock(pan);
-      pan.x = 315;
-      pan.y = 380;
+      pan.x = pan.homeX;
+      pan.y = pan.homeY;
+      syncCookingAudio();
       if (window.DebugDapur.AudioManager) {
         window.DebugDapur.AudioManager.playClick();
       }
@@ -309,18 +393,20 @@ window.DebugDapur.LevelManager = (function() {
   }
 
   function handleIngredientClick(item) {
-    const activeCookware = pot.isDockedOnStove ? pot : (pan.isDockedOnStove ? pan : null);
-
-    if (!activeCookware) {
-      chefBug.setState("confused", "Siapkan dan letakkan panci atau wajan di kompor terlebih dahulu!", 3000);
+    // Allow filling water directly from ingredient shelf when pot is on counter or unlit stove
+    if (item.id === "water") {
+      handleWaterTapClick();
       return;
     }
 
-    // WATER
-    if (item.id === "water") {
-      activeCookware.hasWater = true;
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playWaterPour();
-      logStep("Menambahkan air bersih", true);
+    const activeCookware = (levelData.cookwareNeeded === 'pot')
+      ? (pot.isDockedOnStove ? pot : null)
+      : (levelData.cookwareNeeded === 'pan')
+        ? (pan.isDockedOnStove ? pan : null)
+        : (pot.isDockedOnStove ? pot : (pan.isDockedOnStove ? pan : null));
+
+    if (!activeCookware) {
+      chefBug.setState("confused", "Siapkan dan letakkan panci atau wajan di kompor terlebih dahulu!", 3000);
       return;
     }
 
@@ -332,7 +418,7 @@ window.DebugDapur.LevelManager = (function() {
         return;
       }
       activeCookware.contents.push("noodles");
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playClick();
+      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playIngredientDrop();
       logStep("Memasukkan mie instan ke air mendidih", true);
       chefBug.setState("happy", "Kondisi IF terpenuhi! Mie sedang dimasak.", 3000);
       updateHUD();
@@ -347,7 +433,7 @@ window.DebugDapur.LevelManager = (function() {
         return;
       }
       activeCookware.contents.push("seasoning");
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playClick();
+      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playSeasoningSprinkle();
       logStep("Menaburkan bumbu gurih", true);
       updateHUD();
       return;
@@ -355,8 +441,9 @@ window.DebugDapur.LevelManager = (function() {
 
     // OIL (Level 3, 4, 5)
     if (item.id === "oil") {
-      activeCookware.hasOil = true;
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playWaterPour();
+      const targetPan = pan.isDockedOnStove ? pan : activeCookware;
+      targetPan.hasOil = true;
+      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playOilPour();
       logStep("Menuangkan minyak goreng ke wajan", true);
       chefBug.setState("cooking", "Minyak dituang. Tunggu hingga panas berdesis!", 2500);
       updateHUD();
@@ -365,13 +452,14 @@ window.DebugDapur.LevelManager = (function() {
 
     // EGG (Level 3)
     if (item.id === "egg") {
-      const validation = window.DebugDapur.AlgorithmEngine.validateAction("POUR_EGG", { pan: activeCookware });
+      const targetPan = pan.isDockedOnStove ? pan : activeCookware;
+      const validation = window.DebugDapur.AlgorithmEngine.validateAction("POUR_EGG", { pan: targetPan });
       if (!validation.valid) {
         window.DebugDapur.FeedbackSystem.showBugAlert(validation, chefBug);
         return;
       }
-      activeCookware.contents.push("egg");
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playWaterPour();
+      targetPan.contents.push("egg");
+      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playEggCrack();
       logStep("Menuang adonan telur dadar ke minyak panas", true);
       chefBug.setState("happy", "Szzzzz! Telur dadar mulai mengembang harum.", 3000);
       updateHUD();
@@ -380,8 +468,9 @@ window.DebugDapur.LevelManager = (function() {
 
     // RICE (Level 4)
     if (item.id === "rice") {
-      activeCookware.contents.push("rice");
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playClick();
+      const targetCookware = pan.isDockedOnStove ? pan : activeCookware;
+      targetCookware.contents.push("rice");
+      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playIngredientDrop();
       logStep("Memasukkan nasi putih ke wajan", true);
       chefBug.setState("happy", "Nasi putih sudah masuk! Sekarang tambahkan bumbu & aduk berulang.", 3000);
       updateHUD();
@@ -390,8 +479,9 @@ window.DebugDapur.LevelManager = (function() {
 
     // SAUCE (Level 4)
     if (item.id === "sauce") {
-      activeCookware.contents.push("sauce");
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playClick();
+      const targetPan = pan.isDockedOnStove ? pan : activeCookware;
+      targetPan.contents.push("sauce");
+      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playOilPour();
       logStep("Menuangkan kecap manis legit", true);
       updateHUD();
       return;
@@ -399,13 +489,14 @@ window.DebugDapur.LevelManager = (function() {
 
     // CHICKEN (Level 5)
     if (item.id === "chicken") {
-      const validation = window.DebugDapur.AlgorithmEngine.validateAction("ADD_CHICKEN", { pan: activeCookware });
+      const targetPan = pan.isDockedOnStove ? pan : activeCookware;
+      const validation = window.DebugDapur.AlgorithmEngine.validateAction("ADD_CHICKEN", { pan: targetPan });
       if (!validation.valid) {
         window.DebugDapur.FeedbackSystem.showBugAlert(validation, chefBug);
         return;
       }
-      activeCookware.contents.push("chicken");
-      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playClick();
+      targetPan.contents.push("chicken");
+      if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playIngredientDrop();
       logStep("Memasukkan ayam marinasi ke minyak panas", true);
       chefBug.setState("cooking", "Ayam masuk! Perhatikan letupan minyak!", 3000);
       updateHUD();
@@ -429,6 +520,7 @@ window.DebugDapur.LevelManager = (function() {
         return;
       }
       activePan.eggFlipped = true;
+      utensils.triggerSpatulaUse();
       if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playSpatulaFlip();
       logStep("Membalik telur dadar (sisi kedua matang)", true);
       chefBug.setState("happy", "Pilihan IF-ELSE tepat! Sisi bawah matang, kini mematangkan sisi atas.", 3000);
@@ -445,6 +537,7 @@ window.DebugDapur.LevelManager = (function() {
       }
       activePan.riceStirCount++;
       utensils.spatula.stirCount = activePan.riceStirCount;
+      utensils.triggerSpatulaUse();
       if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playStir();
       logStep(`[Loop While] Mengaduk nasi (Iterasi ke-${activePan.riceStirCount}/6)`, true);
 
@@ -466,6 +559,7 @@ window.DebugDapur.LevelManager = (function() {
         return;
       }
       activePan.chickenFlipped = true;
+      utensils.triggerSpatulaUse();
       if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playSpatulaFlip();
       logStep("Membalik ayam krispi ke sisi emas", true);
       chefBug.setState("happy", "Ayam dibalik dengan aman tanpa letupan minyak!", 3000);
@@ -473,7 +567,8 @@ window.DebugDapur.LevelManager = (function() {
       return;
     }
 
-    // Generic stir sound
+    // Generic stir sound & animation
+    utensils.triggerSpatulaUse();
     if (window.DebugDapur.AudioManager) window.DebugDapur.AudioManager.playStir();
   }
 
@@ -580,11 +675,11 @@ window.DebugDapur.LevelManager = (function() {
     // 1. Kitchen Background & Floor
     renderKitchenEnvironment(ctx);
 
-    // 2. Interactive Objects
-    if (utensils) utensils.render(ctx);
+    // 2. Stove first, then cookware on counter/burners, then utensils (tap, plate, spatula) in front
     if (stove) stove.render(ctx);
     if (pot && levelData && levelData.cookwareNeeded !== 'pan') pot.render(ctx);
     if (pan && levelData && levelData.cookwareNeeded !== 'pot') pan.render(ctx);
+    if (utensils) utensils.render(ctx);
     if (ingredients) ingredients.render(ctx);
 
     // 3. Chef Bug

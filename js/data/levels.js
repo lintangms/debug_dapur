@@ -54,23 +54,28 @@ window.DebugDapur.Data.LEVELS = [
     hintText: "Urutannya: Panci -> Isi Air -> Taruh di Kompor -> Nyalakan Api -> Tunggu mendidih!",
     flowchart: {
       title: "Bagan Alir: Algoritma Merebus Air",
-      conceptNote: "Simbol persegi panjang mewakili PROSES (langkah eksekusi). Dalam sekuens, panah mengalir lurus dari atas ke bawah.",
-      challengeText: "Lengkapi blok rumpang pada diagram alir di bawah ini sebelum mulai memasak di dapur!",
+      conceptNote: "Simbol persegi panjang mewakili PROSES (langkah berurutan). Lihat langkah sebelum dan sesudah kotak [ ? ] untuk menebak langkah yang hilang.",
+      challengeText: "Lengkapi blok proses yang hilang agar urutan merebus air aman dan logis:",
       nodes: [
         { id: "n1", type: "terminator", label: "Mulai" },
         { id: "n2", type: "process", label: "Siapkan panci bersih" },
-        { 
-          id: "n3", 
-          type: "process", 
-          label: "Isi air ke dalam panci", 
-          isMissing: true, 
-          options: ["Isi air ke dalam panci", "Nyalakan kompor kosong", "Minum air mentah"], 
-          correctAnswer: "Isi air ke dalam panci",
-          explanation: "Dalam sekuensial yang aman, air harus diisikan ke dalam panci sebelum diletakkan di atas kompor panas."
+        {
+          id: "n3",
+          type: "process",
+          label: "Isi air bersih ke dalam panci",
+          isMissing: true,
+          options: ["Nyalakan kompor kosong", "Isi air bersih ke dalam panci", "Langsung sajikan panci kosong"],
+          correctAnswer: "Isi air bersih ke dalam panci",
+          hint: "Panci sudah disiapkan dan setelah ini akan ditaruh di kompor. Apa yang harus diisi ke dalam panci terlebih dahulu?",
+          wrongFeedback: {
+            "Nyalakan kompor kosong": "Bahaya! Menyalakan kompor sebelum panci berisi air ditaruh membuat gas terbuang dan panci bisa rusak.",
+            "Langsung sajikan panci kosong": "Air bahkan belum dimasukkan dan belum direbus, tujuan memasak air belum tercapai!"
+          },
+          explanation: "Dalam urutan (sekuens) yang aman, air harus diisikan ke dalam panci sebelum panci ditaruh di atas kompor panas."
         },
-        { id: "n4", type: "process", label: "Taruh panci di kompor" },
+        { id: "n4", type: "process", label: "Taruh panci di atas kompor" },
         { id: "n5", type: "process", label: "Nyalakan api kompor" },
-        { id: "n6", type: "process", label: "Tunggu air mendidih (100°C)" },
+        { id: "n6", type: "process", label: "Tunggu hingga air mendidih (100°C)" },
         { id: "n7", type: "terminator", label: "Selesai" }
       ]
     }
@@ -101,25 +106,30 @@ window.DebugDapur.Data.LEVELS = [
     timeLimit: 150,
     hintText: "Jangan masukkan mie saat air masih dingin! Cek apakah gelembung air sudah mendidih (IF air_mendidih == true).",
     flowchart: {
-      title: "Bagan Alir: Percabangan Merebus Mie",
-      conceptNote: "Simbol belah ketupat mewakili KEPUTUSAN / DECISION (IF). Diagram memiliki dua cabang: YA (True) dan TIDAK (False).",
-      challengeText: "Pilih simbol Decision (Belah Ketupat) yang mengevaluasi prasyarat sebelum mie dimasukkan!",
+      title: "Bagan Alir: Percabangan Merebus Mie (IF)",
+      conceptNote: "Simbol DECISION (IF?) memeriksa syarat sebelum melangkah. Cabang YA dijalankan jika syarat terpenuhi, cabang TIDAK dijalankan jika belum.",
+      challengeText: "Syarat apa yang harus diperiksa sebelum mie boleh dimasukkan ke dalam panci?",
       nodes: [
         { id: "n1", type: "terminator", label: "Mulai" },
-        { id: "n2", type: "process", label: "Panaskan air dalam panci" },
-        { 
-          id: "n3", 
-          type: "decision", 
-          label: "Apakah air mendidih?", 
-          isMissing: true, 
-          options: ["Apakah air mendidih?", "Langsung tuang mie mentah", "Matikan kompor sekarang"], 
-          correctAnswer: "Apakah air mendidih?",
+        { id: "n2", type: "process", label: "Isi air & panaskan panci di kompor" },
+        {
+          id: "n3",
+          type: "decision",
+          label: "Apakah air sudah mendidih?",
+          isMissing: true,
+          options: ["Apakah panci masih kosong?", "Matikan kompor sekarang?", "Apakah air sudah mendidih?"],
+          correctAnswer: "Apakah air sudah mendidih?",
           yesTo: "n5",
           noTo: "n4",
-          explanation: "Kondisi 'air_mendidih == true' harus terpenuhi terlebih dahulu sebelum melangkah ke proses memasukkan mie."
+          hint: "Lihat cabang YA dan TIDAK di bawahnya: jika TIDAK kita menunggu air mendidih, jika YA kita masukkan mie!",
+          wrongFeedback: {
+            "Apakah panci masih kosong?": "Jika panci kosong tentu tidak bisa merebus mie! Syarat yang dicek adalah status air panas.",
+            "Matikan kompor sekarang?": "Kompor justru harus tetap menyala agar air bisa mendidih dan mie matang."
+          },
+          explanation: "Kondisi 'air mendidih == true' harus diperiksa terlebih dahulu sebelum melangkah ke proses memasukkan mie."
         },
-        { id: "n4", type: "process", label: "Tunggu air mendidih", isLoopBack: true },
-        { id: "n5", type: "process", label: "Masukkan mie & bumbu gurih" },
+        { id: "n4", type: "process", label: "Tunggu hingga air mendidih", isLoopBack: true, branchRole: "no" },
+        { id: "n5", type: "process", label: "Masukkan mie & bumbu gurih", branchRole: "yes" },
         { id: "n6", type: "process", label: "Rebus mie hingga matang" },
         { id: "n7", type: "terminator", label: "Selesai (Sajikan)" }
       ]
@@ -152,24 +162,29 @@ window.DebugDapur.Data.LEVELS = [
     hintText: "Pantau warna telur! Jika bawah belum matang jangan dibalik (hancur). Jika kelamaan dibiarkan bisa gosong!",
     flowchart: {
       title: "Bagan Alir: Percabangan Ganda IF-ELSE",
-      conceptNote: "IF-ELSE memberikan dua aksi berbeda: Jika bawah matang (YA), balik telur. Jika belum (TIDAK), lanjut masak bawah.",
-      challengeText: "Pilih kondisi percabangan IF-ELSE yang menentukan kapan telur harus dibalik!",
+      conceptNote: "IF-ELSE memilih 1 dari 2 jalur: jika kondisi YA, telur dibalik. Jika TIDAK, lanjut masak sisi bawah dulu.",
+      challengeText: "Pertanyaan kondisi apa yang menentukan apakah telur sudah boleh dibalik?",
       nodes: [
         { id: "n1", type: "terminator", label: "Mulai" },
-        { id: "n2", type: "process", label: "Panaskan minyak & tuang telur" },
-        { 
-          id: "n3", 
-          type: "decision", 
-          label: "Bagian bawah matang kokoh?", 
-          isMissing: true, 
-          options: ["Bagian bawah matang kokoh?", "Goreng cangkang telur", "Tinggalkan dapur tidur"], 
-          correctAnswer: "Bagian bawah matang kokoh?",
+        { id: "n2", type: "process", label: "Panaskan minyak & tuang adonan telur" },
+        {
+          id: "n3",
+          type: "decision",
+          label: "Apakah bagian bawah sudah matang?",
+          isMissing: true,
+          options: ["Apakah minyak sudah habis?", "Apakah bagian bawah sudah matang?", "Apakah wajan sudah dicuci?"],
+          correctAnswer: "Apakah bagian bawah sudah matang?",
           yesTo: "n5",
           noTo: "n4",
-          explanation: "Mengevaluasi kematangan bawah mencegah telur hancur saat dibalik (jalur ELSE: tunggu)."
+          hint: "Perhatikan jalur YA (Balik telur) dan jalur TIDAK (Lanjutkan masak bagian bawah).",
+          wrongFeedback: {
+            "Apakah minyak sudah habis?": "Keputusan membalik telur tidak bergantung pada minyak habis, melainkan kematangan sisi bawah telur.",
+            "Apakah wajan sudah dicuci?": "Telur sedang dimasak di wajan, bukan saat mencuci wajan!"
+          },
+          explanation: "Mengevaluasi kematangan sisi bawah mencegah telur hancur saat dibalik (jika belum matang, ambil jalur ELSE untuk menunggu)."
         },
-        { id: "n4", type: "process", label: "ELSE: Lanjutkan masak bawah" },
-        { id: "n5", type: "process", label: "IF: Balik telur ke sisi atas" },
+        { id: "n4", type: "process", label: "Lanjutkan masak sisi bawah", isLoopBack: true, branchRole: "no" },
+        { id: "n5", type: "process", label: "Balik telur ke sisi atas", branchRole: "yes" },
         { id: "n6", type: "process", label: "Matangkan kedua sisi sempurna" },
         { id: "n7", type: "terminator", label: "Selesai (Angkat ke Piring)" }
       ]
@@ -202,25 +217,30 @@ window.DebugDapur.Data.LEVELS = [
     hintText: "Klik spatula sebanyak 6 kali untuk perulangan adukan! Kurang dari 6x nasi belum rata, lebih dari 10x nasi bisa gosong.",
     flowchart: {
       title: "Bagan Alir: Perulangan WHILE Pengadukan",
-      conceptNote: "Perulangan (Loop) memiliki kondisi terminasi counter. Selama kondisi bernilai YA, alur kembali berputar ke atas.",
-      challengeText: "Pilih kondisi loop counter yang mengontrol perulangan pengadukan nasi!",
+      conceptNote: "Perulangan (Loop) mengulang aksi yang sama selama kondisi batas masih bernilai YA. Target adukan nasi goreng adalah 6 kali.",
+      challengeText: "Pilih syarat batas perulangan (Loop) yang tepat untuk mengaduk nasi sebanyak 6 kali:",
       nodes: [
         { id: "n1", type: "terminator", label: "Mulai" },
-        { id: "n2", type: "process", label: "Masukkan nasi, bumbu & kecap" },
-        { id: "n3", type: "process", label: "Inisialisasi: stir_count = 0" },
-        { 
-          id: "n4", 
-          type: "decision", 
-          label: "stir_count < 6?", 
-          isMissing: true, 
-          options: ["stir_count < 6?", "stir_count == 999?", "nasi_hilang == true?"], 
-          correctAnswer: "stir_count < 6?",
+        { id: "n2", type: "process", label: "Masukkan minyak, nasi, bumbu & kecap" },
+        { id: "n3", type: "process", label: "Mulai hitungan aduk = 0" },
+        {
+          id: "n4",
+          type: "decision",
+          label: "Hitungan aduk < 6?",
+          isMissing: true,
+          options: ["Hitungan aduk == 999?", "Hitungan aduk < 6?", "Api kompor sudah mati?"],
+          correctAnswer: "Hitungan aduk < 6?",
           yesTo: "n5",
           noTo: "n6",
-          explanation: "Perulangan adukan terus berjalan selama counter stir_count masih di bawah target 6 adukan."
+          hint: "Selama hitungan adukan belum mencapai target 6x, cabang YA akan mengulang aksi mengaduk dengan spatula.",
+          wrongFeedback: {
+            "Hitungan aduk == 999?": "Karena hitungan dimulai dari 0, kondisi (0 == 999) langsung bernilai TIDAK dan nasi tidak pernah diaduk!",
+            "Api kompor sudah mati?": "Jika kompor mati, pengadukan justru berhenti di tengah jalan sebelum bumbu tercampur."
+          },
+          explanation: "Perulangan terus mengaduk (cabang YA) selama hitungan adukan masih kurang dari 6 kali (< 6), lalu berhenti saat sudah 6 kali."
         },
-        { id: "n5", type: "process", label: "Aduk spatula & stir_count++", isLoopBack: true },
-        { id: "n6", type: "process", label: "Nasi tanak merata -> Angkat" },
+        { id: "n5", type: "process", label: "Aduk spatula & hitungan +1", isLoopBack: true, branchRole: "yes" },
+        { id: "n6", type: "process", label: "Nasi matang merata -> Angkat", branchRole: "no" },
         { id: "n7", type: "terminator", label: "Selesai" }
       ]
     }
@@ -252,24 +272,29 @@ window.DebugDapur.Data.LEVELS = [
     hintText: "Saat minyak meletup-letup (minyak_meletup == true), segera kecilkan api sebelum membalik ayam!",
     flowchart: {
       title: "Bagan Alir: Percabangan Bersarang (Nested IF)",
-      conceptNote: "Nested IF berarti ada simbol Decision di dalam cabang Decision sebelumnya. Keputusan letupan minyak dievaluasi saat penggorengan berlangsung.",
-      challengeText: "Pilih kondisi percabangan internal (Nested IF) saat ayam berada di minyak panas!",
+      conceptNote: "Nested IF artinya ada pemeriksaan kondisi tambahan di dalam proses menggoreng ayam ketika minyak sudah panas.",
+      challengeText: "Kondisi apa yang harus dicek saat ayam digoreng sebelum kita boleh membaliknya?",
       nodes: [
         { id: "n1", type: "terminator", label: "Mulai" },
         { id: "n2", type: "process", label: "Panaskan minyak & masukkan ayam" },
-        { 
-          id: "n3", 
-          type: "decision", 
-          label: "Minyak meletup? (Nested IF)", 
-          isMissing: true, 
-          options: ["Minyak meletup? (Nested IF)", "Ayam bisa terbang?", "Wajan meleleh?"], 
-          correctAnswer: "Minyak meletup? (Nested IF)",
+        {
+          id: "n3",
+          type: "decision",
+          label: "Apakah minyak meletup panas?",
+          isMissing: true,
+          options: ["Apakah ayam masih mentah beku?", "Apakah wajan belum ada minyak?", "Apakah minyak meletup panas?"],
+          correctAnswer: "Apakah minyak meletup panas?",
           yesTo: "n4",
           noTo: "n5",
-          explanation: "Nested IF: Jika minyak meletup (YA), kecilkan api terlebih dahulu sebelum membalik ayam."
+          hint: "Lihat hasil cabang YA ('Kecilkan api kompor') dan cabang TIDAK ('Balik ayam'). Kondisi apa yang memicu kita mengecilkan api?",
+          wrongFeedback: {
+            "Apakah ayam masih mentah beku?": "Ayam yang sudah masuk di minyak panas tidak dicek dengan mengecilkan api karena beku — perhatikan cabang YA!",
+            "Apakah wajan belum ada minyak?": "Minyak sudah dipanaskan di langkah sebelumnya. Lihat cabang YA: mengecilkan api."
+          },
+          explanation: "Nested IF: Jika minyak sedang meletup (YA), kecilkan api terlebih dahulu agar aman sebelum membalik ayam."
         },
-        { id: "n4", type: "process", label: "YA: Kecilkan api kompor" },
-        { id: "n5", type: "process", label: "TIDAK: Balik ayam hingga keemasan" },
+        { id: "n4", type: "process", label: "Kecilkan api kompor dahulu", branchRole: "yes" },
+        { id: "n5", type: "process", label: "Balik ayam hingga keemasan", branchRole: "no" },
         { id: "n6", type: "process", label: "Tiriskan ayam krispi" },
         { id: "n7", type: "terminator", label: "Selesai" }
       ]
@@ -298,20 +323,25 @@ window.DebugDapur.Data.LEVELS = [
     hintText: "Gunakan dekomposisi! Selesaikan setiap prosedur memasak satu per satu secara efisien.",
     flowchart: {
       title: "Bagan Alir: Dekomposisi Prosedur (Sub-rutin)",
-      conceptNote: "Simbol Prosedur (Predefined Process) memiliki garis ganda vertikal di sisinya, memanggil modul instruksi yang telah didefinisikan.",
-      challengeText: "Lengkapi pemanggilan prosedur memasak lauk pauk pada rangkaian paket hemat!",
+      conceptNote: "Simbol SUB-RUTIN memanggil satu modul tugas memasak yang terpisah agar paket lengkap tersusun rapi dan efisien.",
+      challengeText: "Lengkapi panggilan prosedur lauk ketiga agar Paket Komplit (Nasi + Ayam + Telur) lengkap:",
       nodes: [
         { id: "n1", type: "terminator", label: "Mulai" },
         { id: "n2", type: "subroutine", label: "Panggil: masak_nasi()" },
         { id: "n3", type: "subroutine", label: "Panggil: masak_ayam()" },
-        { 
-          id: "n4", 
-          type: "subroutine", 
-          label: "Panggil: masak_telur()", 
-          isMissing: true, 
-          options: ["Panggil: masak_telur()", "Beli makanan online", "Cuci baju kotor"], 
+        {
+          id: "n4",
+          type: "subroutine",
+          label: "Panggil: masak_telur()",
+          isMissing: true,
+          options: ["Ulangi masak_nasi() lagi", "Panggil: masak_telur()", "Sajikan piring kosong"],
           correctAnswer: "Panggil: masak_telur()",
-          explanation: "Dekomposisi: Tiap sub-rutin (nasi, ayam, telur) menyelesaikan sub-tugasnya sendiri secara modular."
+          hint: "Target paket adalah Nasi + Ayam + Telur. Nasi dan ayam sudah dimasak, prosedur mana yang belum dipanggil?",
+          wrongFeedback: {
+            "Ulangi masak_nasi() lagi": "Nasi sudah dimasak pada prosedur pertama. Jika diulang, paket malah kekurangan lauk telur!",
+            "Sajikan piring kosong": "Langkah berikutnya baru menyatukan semua lauk ke piring saji, dan telur belum dimasak!"
+          },
+          explanation: "Dekomposisi: Tiap sub-rutin (nasi, ayam, telur) menyelesaikan sub-tugasnya sendiri secara modular sebelum digabung."
         },
         { id: "n5", type: "process", label: "Satukan semua ke piring saji" },
         { id: "n6", type: "terminator", label: "Selesai" }
@@ -349,23 +379,31 @@ window.DebugDapur.Data.LEVELS = [
     hintText: "Telusuri resep baris demi baris! Urutkan langkah persiapan, perbaiki perulangan tak hingga (infinite loop), dan perbaiki logika IF.",
     flowchart: {
       title: "Bagan Alir: Debugging Resep Liwet Warisan",
-      conceptNote: "Pada tantangan Boss, telusuri alur diagram alir untuk menemukan letak Infinite Loop dan kondisi IF yang salah!",
-      challengeText: "Perbaiki galat perulangan tak terhingga (Infinite Loop) pada bagan alir berikut!",
+      conceptNote: "Pada tantangan Boss, temukan perbaikan kondisi perulangan agar resep tidak mengalami Infinite Loop (aduk tanpa henti).",
+      challengeText: "Pilih kondisi loop yang benar untuk menggantikan bug 'aduk tanpa henti':",
       nodes: [
         { id: "n1", type: "terminator", label: "Mulai" },
-        { id: "n2", type: "process", label: "Persiapan panci & beras rempah" },
+        { id: "n2", type: "process", label: "Siapkan panci & masukkan beras rempah" },
         { id: "n3", type: "process", label: "Taruh di kompor & nyalakan api" },
-        { 
-          id: "n4", 
-          type: "decision", 
-          label: "adukan < 5? (Loop Terkontrol)", 
-          isMissing: true, 
-          options: ["adukan < 5? (Loop Terkontrol)", "WHILE (true) { Aduk selamanya }", "Hancurkan panci"], 
-          correctAnswer: "adukan < 5? (Loop Terkontrol)",
+        {
+          id: "n4",
+          type: "decision",
+          label: "Apakah adukan < 5 kali?",
+          isMissing: true,
+          options: ["Aduk terus selamanya (true)", "Matikan api sebelum dimasak", "Apakah adukan < 5 kali?"],
+          correctAnswer: "Apakah adukan < 5 kali?",
+          yesTo: "n5",
+          noTo: "n6",
+          hint: "Loop yang sehat butuh batas berhenti! Jika adukan belum 5 kali (YA), aduk lagi; jika sudah 5 kali (TIDAK), lanjut sajikan.",
+          wrongFeedback: {
+            "Aduk terus selamanya (true)": "Itu justru penyebab Infinite Loop! Program tidak akan pernah berhenti dan nasi jadi gosong.",
+            "Matikan api sebelum dimasak": "Jika kompor dimatikan sebelum diaduk dan matang, nasi liwet tetap mentah."
+          },
           explanation: "Mengganti loop tanpa batas dengan batas terkontrol (adukan < 5) mencegah program macet dan nasi gosong!"
         },
-        { id: "n5", type: "decision", label: "Nasi tanak harum? -> Sajikan" },
-        { id: "n6", type: "terminator", label: "Selesai (Nasi Liwet Juara)" }
+        { id: "n5", type: "process", label: "Aduk nasi liwet (+1)", isLoopBack: true, branchRole: "yes" },
+        { id: "n6", type: "process", label: "Nasi tanak & harum -> Sajikan", branchRole: "no" },
+        { id: "n7", type: "terminator", label: "Selesai (Nasi Liwet Juara)" }
       ]
     }
   }

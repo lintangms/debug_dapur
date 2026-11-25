@@ -108,14 +108,24 @@ window.DebugDapur.Objects.Stove = class Stove {
   }
 
   dock(cookware, burnerId = 0) {
-    const b = this.burners[burnerId];
+    let b = this.burners[burnerId];
+    // Prevent stacking on an already occupied burner: pick the other free burner if available
+    if (b && b.dockedCookware && b.dockedCookware !== cookware) {
+      const freeBurner = this.burners.find(other => !other.dockedCookware);
+      if (!freeBurner) return false;
+      b = freeBurner;
+    }
     if (b) {
+      // Undock from any previous burner first
+      this.undock(cookware);
       b.dockedCookware = cookware;
       cookware.x = b.x;
       cookware.y = b.y - 15;
       cookware.isDockedOnStove = true;
       cookware.activeBurner = b;
+      return true;
     }
+    return false;
   }
 
   undock(cookware) {
