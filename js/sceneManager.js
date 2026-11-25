@@ -181,8 +181,26 @@ window.DebugDapur.SceneManager = (function() {
     // Level Select Back Button
     const btnSelectBack = document.getElementById("level-select-back-btn");
     if (btnSelectBack) {
-      btnSelectBack.addEventListener("click", () => showScreen("menu"));
+      btnSelectBack.addEventListener("click", () => {
+        if (window.DebugDapur.AudioManager) {
+          window.DebugDapur.AudioManager.playClick();
+        }
+        showScreen("menu");
+      });
     }
+
+    // Set filter bar click listeners once here in bindEvents
+    document.querySelectorAll(".level-filter-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        document.querySelectorAll(".level-filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        activeLevelFilter = btn.dataset.filter || "all";
+        renderLevelSelectGrid();
+        if (window.DebugDapur.AudioManager) {
+          window.DebugDapur.AudioManager.playClick();
+        }
+      });
+    });
 
     // Flowchart Briefing Back & Start Buttons
     const btnFcBack = document.getElementById("fc-btn-back-menu");
@@ -505,6 +523,8 @@ window.DebugDapur.SceneManager = (function() {
     }
   }
 
+  let activeLevelFilter = "all";
+
   function renderLevelSelectGrid() {
     const grid = document.getElementById("level-select-grid");
     if (!grid) return;
@@ -520,54 +540,99 @@ window.DebugDapur.SceneManager = (function() {
     }
 
     levels.forEach(lvl => {
+      // Filter check
+      if (activeLevelFilter === "dasar" && (lvl.id < 1 || lvl.id > 2)) return;
+      if (activeLevelFilter === "menengah" && (lvl.id < 3 || lvl.id > 5)) return;
+      if (activeLevelFilter === "mahir" && (lvl.id < 6 || lvl.id > 7)) return;
+
       const isUnlocked = storage.isLevelUnlocked(lvl.id);
       const stars = storage.getData().levelStars[lvl.id] || 0;
+      const highScore = storage.getData().levelHighScores[lvl.id] || 0;
 
       const card = document.createElement("div");
       card.className = `level-card ${isUnlocked ? "unlocked" : "locked"}`;
+      card.setAttribute("data-level-id", lvl.id);
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", isUnlocked ? "0" : "-1");
 
       let starHtml = `${getStarSvg(false)}${getStarSvg(false)}${getStarSvg(false)}`;
       if (stars === 3) starHtml = `${getStarSvg(true)}${getStarSvg(true)}${getStarSvg(true)}`;
       else if (stars === 2) starHtml = `${getStarSvg(true)}${getStarSvg(true)}${getStarSvg(false)}`;
       else if (stars === 1) starHtml = `${getStarSvg(true)}${getStarSvg(false)}${getStarSvg(false)}`;
 
+      const statusBadge = isUnlocked
+        ? (stars > 0 ? `<span class="level-card-status-badge status-badge-completed">Selesai (${stars}★)</span>` : `<span class="level-card-status-badge status-badge-ready">Terbuka</span>`)
+        : `<span class="level-card-status-badge status-badge-locked">Terkunci</span>`;
+
       card.innerHTML = `
-        <div class="level-card-number">Level ${lvl.id}</div>
+        <div class="level-card-top-row">
+          <div class="level-card-number">Level ${lvl.id}</div>
+          ${statusBadge}
+        </div>
         <div class="level-card-title">${lvl.title.split(": ")[1]}</div>
+        <div class="level-card-dish">🎯 ${lvl.targetDish}</div>
         <div class="level-card-concept">${lvl.concept}</div>
-        <div class="level-card-stars">${isUnlocked ? starHtml : "<span style='color:#78909C; font-weight:700;'>Terkunci</span>"}</div>
+        <div class="level-card-stars">
+          ${isUnlocked ? starHtml : "<span style='color:#78909C; font-weight:700;'>Selesaikan level sebelumnya</span>"}
+          ${highScore > 0 ? `<span style='font-size:11px; color:#546E7A; margin-left:6px;'>(${highScore} pts)</span>` : ''}
+        </div>
+        ${isUnlocked ? '<button class="btn btn-primary level-card-btn" style="margin-top: 6px; padding: 7px 14px; font-size: 13px; width: 100%;">Masuk Level</button>' : ''}
       `;
 
       if (isUnlocked) {
-        card.addEventListener("click", () => {
+        const triggerLevelOpen = (e) => {
+          e.stopPropagation();
           if (window.DebugDapur.AudioManager) {
             window.DebugDapur.AudioManager.playClick();
           }
           startLevelWithFlowchart(lvl.id);
+        };
+        card.addEventListener("click", triggerLevelOpen);
+        const cardBtn = card.querySelector(".level-card-btn");
+        if (cardBtn) {
+          cardBtn.addEventListener("click", triggerLevelOpen);
+        }
+      } else {
+        card.addEventListener("click", () => {
+          if (window.DebugDapur.AudioManager) {
+            window.DebugDapur.AudioManager.playBugError();
+          }
+          alert(`Level ${lvl.id} masih terkunci! Selesaikan level ${lvl.id - 1} terlebih dahulu.`);
         });
       }
 
       grid.appendChild(card);
     });
 
-    // Final Quiz Card
-    const quizCard = document.createElement("div");
-    const isBossDone = storage.getData().levelStars[7] > 0;
-    quizCard.className = `level-card quiz-card ${isBossDone ? "unlocked" : "locked"}`;
-    quizCard.innerHTML = `
-      <div class="level-card-number">Evaluasi Akhir</div>
-      <div class="level-card-title">Kuis Algoritma & Tracing</div>
-      <div class="level-card-concept">10 Soal Berpikir Komputasional</div>
-      <div class="level-card-stars" style="color: #6A1B9A; font-weight: 700;">${isBossDone ? "Buka Kuis Evaluasi" : "Selesaikan Level 7"}</div>
-    `;
+    // Final Quiz Card (always visible in 'all' and 'mahir' filters)
+    if (activeLevelFilter === "all" || activeLevelFilter === "mahir") {
+      const quizCard = document.createElement("div");
+      const isBossDone = storage.getData().levelStars[7] > 0;
+      const quizScore = storage.getData().quizScore || 0;
+      quizCard.className = `level-card quiz-card ${isBossDone ? "unlocked" : "locked"}`;
+      quizCard.innerHTML = `
+        <div class="level-card-top-row">
+          <div class="level-card-number">Evaluasi Akhir</div>
+          <span class="level-card-status-badge ${isBossDone ? 'status-badge-ready' : 'status-badge-locked'}">
+            ${isBossDone ? (quizScore > 0 ? `Skor: ${quizScore}%` : 'Tersedia') : 'Terkunci'}
+          </span>
+        </div>
+        <div class="level-card-title">Kuis Algoritma & Tracing</div>
+        <div class="level-card-dish">📝 10 Soal Berpikir Komputasional</div>
+        <div class="level-card-concept">EVALUASI AKHIR</div>
+        <div class="level-card-stars" style="color: #6A1B9A; font-weight: 700;">
+          ${isBossDone ? "Buka Kuis Evaluasi" : "Selesaikan Level 7"}
+        </div>
+      `;
 
-    if (isBossDone) {
-      quizCard.addEventListener("click", () => {
-        showScreen("quiz");
-      });
+      if (isBossDone) {
+        quizCard.addEventListener("click", () => {
+          showScreen("quiz");
+        });
+      }
+
+      grid.appendChild(quizCard);
     }
-
-    grid.appendChild(quizCard);
   }
 
   function populateRecipeBoard() {

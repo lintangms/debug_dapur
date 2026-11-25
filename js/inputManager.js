@@ -18,7 +18,10 @@ window.DebugDapur.InputManager = (function() {
     click: [],
     down: [],
     up: [],
-    move: []
+    move: [],
+    dragstart: [],
+    drag: [],
+    dragend: []
   };
 
   function init(canvasElement) {
@@ -46,11 +49,21 @@ window.DebugDapur.InputManager = (function() {
     };
   }
 
+  let dragThreshold = 3;
+  let startX = 0;
+  let startY = 0;
+  let isDragging = false;
+  let hasFiredDragStart = false;
+
   function onMouseDown(e) {
     const coords = getCanvasCoords(e.clientX, e.clientY);
     mouse.x = coords.x;
     mouse.y = coords.y;
     mouse.isDown = true;
+    startX = coords.x;
+    startY = coords.y;
+    isDragging = false;
+    hasFiredDragStart = false;
     notify('down', mouse);
   }
 
@@ -58,6 +71,17 @@ window.DebugDapur.InputManager = (function() {
     const coords = getCanvasCoords(e.clientX, e.clientY);
     mouse.x = coords.x;
     mouse.y = coords.y;
+    if (mouse.isDown) {
+      const dist = Math.hypot(coords.x - startX, coords.y - startY);
+      if (dist >= dragThreshold) {
+        isDragging = true;
+        if (!hasFiredDragStart) {
+          hasFiredDragStart = true;
+          notify('dragstart', mouse);
+        }
+        notify('drag', mouse);
+      }
+    }
     notify('move', mouse);
   }
 
@@ -66,8 +90,14 @@ window.DebugDapur.InputManager = (function() {
     mouse.x = coords.x;
     mouse.y = coords.y;
     mouse.isDown = false;
+    if (isDragging) {
+      isDragging = false;
+      hasFiredDragStart = false;
+      notify('dragend', mouse);
+    } else {
+      notify('click', mouse);
+    }
     notify('up', mouse);
-    notify('click', mouse);
   }
 
   function onTouchStart(e) {
@@ -78,6 +108,10 @@ window.DebugDapur.InputManager = (function() {
       mouse.x = coords.x;
       mouse.y = coords.y;
       mouse.isDown = true;
+      startX = coords.x;
+      startY = coords.y;
+      isDragging = false;
+      hasFiredDragStart = false;
       notify('down', mouse);
     }
   }
@@ -89,6 +123,17 @@ window.DebugDapur.InputManager = (function() {
       const coords = getCanvasCoords(touch.clientX, touch.clientY);
       mouse.x = coords.x;
       mouse.y = coords.y;
+      if (mouse.isDown) {
+        const dist = Math.hypot(coords.x - startX, coords.y - startY);
+        if (dist >= dragThreshold) {
+          isDragging = true;
+          if (!hasFiredDragStart) {
+            hasFiredDragStart = true;
+            notify('dragstart', mouse);
+          }
+          notify('drag', mouse);
+        }
+      }
       notify('move', mouse);
     }
   }
@@ -96,8 +141,14 @@ window.DebugDapur.InputManager = (function() {
   function onTouchEnd(e) {
     e.preventDefault();
     mouse.isDown = false;
+    if (isDragging) {
+      isDragging = false;
+      hasFiredDragStart = false;
+      notify('dragend', mouse);
+    } else {
+      notify('click', mouse);
+    }
     notify('up', mouse);
-    notify('click', mouse);
   }
 
   function on(event, callback) {

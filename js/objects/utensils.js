@@ -10,6 +10,8 @@ window.DebugDapur.Objects.Utensils = class Utensils {
   constructor() {
     // Spatula on counter (clearly placed to the right of the stove, never hidden behind it)
     this.spatula = {
+      homeX: 845,
+      homeY: 335,
       x: 845,
       y: 335,
       width: 74,
@@ -29,7 +31,8 @@ window.DebugDapur.Objects.Utensils = class Utensils {
       radiusY: 32,
       isHovered: false,
       hasDish: false,
-      dishName: ""
+      dishName: "",
+      contents: [] // items served onto plate
     };
 
     // Water Tap / Sink Station (Left side)
@@ -41,10 +44,35 @@ window.DebugDapur.Objects.Utensils = class Utensils {
       isRunning: false,
       waterStreamTimer: 0
     };
+
+    // Trash Can Station (Meja samping kiri bawah wastafel)
+    this.trashCan = {
+      x: 205,
+      y: 450,
+      width: 64,
+      height: 72,
+      isHovered: false,
+      isOpen: false,
+      lidAnimTimer: 0,
+      trashCount: 0
+    };
+  }
+
+  triggerTrashUse() {
+    this.trashCan.lidAnimTimer = 500;
+    this.trashCan.isOpen = true;
+    this.trashCan.trashCount++;
+  }
+
+  resetSpatula() {
+    this.spatula.x = this.spatula.homeX;
+    this.spatula.y = this.spatula.homeY;
+    this.spatula.isHeld = false;
+    this.spatula.stirAngle = 0;
   }
 
   triggerSpatulaUse() {
-    this.spatula.stirAnimTimer = 320;
+    this.spatula.stirAnimTimer = 350;
   }
 
   update(dt) {
@@ -56,12 +84,25 @@ window.DebugDapur.Objects.Utensils = class Utensils {
       }
     }
 
+    if (this.trashCan.lidAnimTimer > 0) {
+      this.trashCan.lidAnimTimer -= dt;
+      if (this.trashCan.lidAnimTimer <= 0) {
+        this.trashCan.isOpen = false;
+      }
+    }
+
     if (this.spatula.stirAnimTimer > 0) {
       this.spatula.stirAnimTimer = Math.max(0, this.spatula.stirAnimTimer - dt);
       this.spatula.stirAngle = Math.sin(this.spatula.stirAnimTimer * 0.04) * 0.35;
     } else {
       this.spatula.stirAngle = 0;
     }
+  }
+
+  isPointInTrash(px, py) {
+    const tc = this.trashCan;
+    return px >= tc.x - tc.width * 0.5 && px <= tc.x + tc.width * 0.5 &&
+           py >= tc.y - tc.height * 0.5 && py <= tc.y + tc.height * 0.5 + 8;
   }
 
   isPointInSpatula(px, py) {
@@ -83,8 +124,105 @@ window.DebugDapur.Objects.Utensils = class Utensils {
 
   render(ctx) {
     this.renderTap(ctx);
+    this.renderTrashCan(ctx);
     this.renderPlate(ctx);
     this.renderSpatula(ctx);
+  }
+
+  renderTrashCan(ctx) {
+    const tc = this.trashCan;
+    ctx.save();
+
+    // Drop shadow
+    ctx.fillStyle = "rgba(0, 0, 0, 0.18)";
+    ctx.beginPath();
+    ctx.ellipse(tc.x, tc.y + tc.height * 0.48, tc.width * 0.48, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bin body (Trapezoid container)
+    const binGrad = ctx.createLinearGradient(tc.x - tc.width * 0.5, tc.y, tc.x + tc.width * 0.5, tc.y);
+    binGrad.addColorStop(0, tc.isHovered ? "#EF5350" : "#78909C");
+    binGrad.addColorStop(0.3, tc.isHovered ? "#FF7043" : "#90A4AE");
+    binGrad.addColorStop(0.7, tc.isHovered ? "#E53935" : "#607D8B");
+    binGrad.addColorStop(1, tc.isHovered ? "#C62828" : "#455A64");
+
+    ctx.fillStyle = binGrad;
+    ctx.strokeStyle = tc.isHovered ? "#B71C1C" : "#37474F";
+    ctx.lineWidth = 2.5;
+
+    ctx.beginPath();
+    const halfTop = tc.width * 0.44;
+    const halfBot = tc.width * 0.36;
+    const topY = tc.y - tc.height * 0.35;
+    const botY = tc.y + tc.height * 0.46;
+
+    ctx.moveTo(tc.x - halfTop, topY);
+    ctx.lineTo(tc.x + halfTop, topY);
+    ctx.lineTo(tc.x + halfBot, botY);
+    ctx.lineTo(tc.x - halfBot, botY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Recycle / Trash symbol
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(tc.x, tc.y + 6, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#FFFFFF";
+    ctx.beginPath();
+    ctx.moveTo(tc.x - 3, tc.y + 2);
+    ctx.lineTo(tc.x + 3, tc.y + 2);
+    ctx.lineTo(tc.x, tc.y + 9);
+    ctx.closePath();
+    ctx.fill();
+
+    // Lid
+    const lidLift = tc.isOpen ? -14 : 0;
+    const lidAngle = tc.isOpen ? -0.22 : 0;
+
+    ctx.save();
+    ctx.translate(tc.x, topY + lidLift);
+    ctx.rotate(lidAngle);
+
+    // Lid body
+    ctx.fillStyle = tc.isHovered ? "#D32F2F" : "#455A64";
+    ctx.strokeStyle = tc.isHovered ? "#B71C1C" : "#263238";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(-tc.width * 0.5, -6, tc.width, 10, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    // Lid handle
+    ctx.fillStyle = "#ECEFF1";
+    ctx.beginPath();
+    ctx.roundRect(-8, -12, 16, 6, 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Text Label below
+    ctx.font = "bold 9px sans-serif";
+    ctx.fillStyle = tc.isHovered ? "#D32F2F" : "#CFD8DC";
+    ctx.textAlign = "center";
+    ctx.fillText("TONG SAMPAH", tc.x, botY + 12);
+
+    // Notification if user threw away ingredients
+    if (tc.trashCount > 0) {
+      ctx.fillStyle = "#C62828";
+      ctx.beginPath();
+      ctx.arc(tc.x + tc.width * 0.4, topY - 4, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = "bold 9px sans-serif";
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textBaseline = "middle";
+      ctx.fillText("-" + (tc.trashCount * 80), tc.x + tc.width * 0.4, topY - 4);
+    }
+
+    ctx.restore();
   }
 
   renderTap(ctx) {
@@ -164,11 +302,68 @@ window.DebugDapur.Objects.Utensils = class Utensils {
     ctx.ellipse(p.x, p.y, p.radiusX * 0.75, p.radiusY * 0.75, 0, 0, Math.PI * 2);
     ctx.stroke();
 
+    // Render food contents on plate if any
+    if (p.contents && p.contents.length > 0) {
+      // 1. Rice mound
+      if (p.contents.includes("rice")) {
+        ctx.fillStyle = "#FFFFFF";
+        ctx.strokeStyle = "#E0E0E0";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(p.x - (p.contents.length > 1 ? 14 : 0), p.y - 2, 22, 14, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        // Steam specks
+        ctx.fillStyle = "#E0F2F1";
+        ctx.beginPath();
+        ctx.arc(p.x - 14, p.y - 12, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 2. Chicken piece
+      if (p.contents.includes("chicken")) {
+        ctx.fillStyle = "#BF360C";
+        ctx.strokeStyle = "#D84315";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(p.x + 6, p.y - 12, 26, 16, 6);
+        ctx.fill();
+        ctx.stroke();
+        // Golden crust specks
+        ctx.fillStyle = "#FFB300";
+        ctx.beginPath();
+        ctx.arc(p.x + 18, p.y - 4, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3. Egg omelette
+      if (p.contents.includes("egg")) {
+        ctx.fillStyle = "#FBC02D";
+        ctx.strokeStyle = "#F57F17";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.ellipse(p.x + (p.contents.length > 1 ? 8 : 0), p.y + 6, 18, 10, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // 4. Noodles
+      if (p.contents.includes("noodles")) {
+        ctx.fillStyle = "#FDD835";
+        ctx.strokeStyle = "#F57F17";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y, 24, 13, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
     // Label
     ctx.font = "bold 10px sans-serif";
     ctx.fillStyle = "#78909C";
     ctx.textAlign = "center";
-    ctx.fillText(p.hasDish ? p.dishName : "PIRING SAJI", p.x, p.y + 4);
+    ctx.fillText(p.hasDish ? p.dishName : "PIRING SAJI", p.x, p.y + 16);
 
     ctx.restore();
   }

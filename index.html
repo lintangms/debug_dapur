@@ -80,7 +80,12 @@
       <!-- SCREEN 3: LEVEL SELECTION -->
       <div id="screen-level-select" class="ui-screen hidden">
         <div class="level-select-header">
-          <h2>PILIH TANTANGAN MEMASAK</h2>
+          <div>
+            <h2>PILIH TANTANGAN MEMASAK</h2>
+            <div style="font-size: 13px; color: #546E7A; font-weight: 600; margin-top: 2px;">
+              Selesaikan level secara berurutan atau ulangi level untuk meraih 3 Bintang sempurna!
+            </div>
+          </div>
           <div style="display: flex; gap: 12px; align-items: center;">
             <span id="total-stars-count" class="stars-summary-pill">0 / 21 Bintang</span>
             <button id="level-select-back-btn" class="btn btn-outline" style="padding: 8px 16px;">
@@ -88,6 +93,14 @@
               <span>Kembali</span>
             </button>
           </div>
+        </div>
+
+        <!-- Level Categories Filter Tabs -->
+        <div class="level-filter-bar">
+          <button class="level-filter-btn active" data-filter="all">Semua Level (1-7)</button>
+          <button class="level-filter-btn" data-filter="dasar">Dapur Dasar (Sekuens & IF)</button>
+          <button class="level-filter-btn" data-filter="menengah">Dapur Menengah (IF-ELSE & Loop)</button>
+          <button class="level-filter-btn" data-filter="mahir">Dapur Mahir & Boss</button>
         </div>
 
         <div id="level-select-grid" class="level-grid">
